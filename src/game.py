@@ -2,6 +2,7 @@
 import arcade
 import os
 import random
+from src.ui_components import RoundButton, RectButton
 from config import *
 
 
@@ -18,7 +19,10 @@ class BaksoGame(arcade.Window):
         self.background_list = None
         self.character_list = None
         self.character_sprite = None
+        self.character_sprite = None
         self.item_sprites = None
+        self.mangkok_sprite = None  # Added mangkok sprite
+        self.buttons = []
         
     def setup(self):
         """Set up the game here. Call this function to restart the game."""
@@ -59,6 +63,15 @@ class BaksoGame(arcade.Window):
         except Exception as e:
             print(f"Error loading gerobak: {e}")
 
+        # Load Mangkok (Character/Item)
+        try:
+            self.mangkok_sprite = arcade.Sprite(f"{ITEMS_PATH}/Mangkok.png", MANGKOK_SCALE)
+            self.mangkok_sprite.center_x = MANGKOK_POS_X
+            self.mangkok_sprite.center_y = MANGKOK_POS_Y
+            self.item_sprites.append(self.mangkok_sprite)
+        except Exception as e:
+            print(f"Error loading mangkok: {e}")
+
         # Load Character (Pembeli)
         try:
             # Get random pembeli image
@@ -83,6 +96,27 @@ class BaksoGame(arcade.Window):
             
         except Exception as e:
             print(f"Error loading character: {e}")
+
+        # Create a sample round button - 100% transparent red (invisible), no text
+        self.test_button = RoundButton(center_x=330, center_y=200, radius=80, 
+                                      color=(255, 0, 0, 0), text="")
+        self.buttons.append(self.test_button)
+        # Create two rectangular buttons using config defaults so positions/sizes are easy to tweak
+        # Transparent Green Button, no text, no border
+        self.rect_btn_1 = RectButton(center_x=BUTTON1_CENTER_X, center_y=BUTTON1_CENTER_Y,
+                                     width=BUTTON1_WIDTH, height=BUTTON1_HEIGHT,
+                                     color=(0, 100, 0, 0), hover_color=(0, 255, 0, 0),
+                                     border_width=0,
+                                     text="")
+        # Transparent Blue Button, no text, no border
+        self.rect_btn_2 = RectButton(center_x=BUTTON2_CENTER_X, center_y=BUTTON2_CENTER_Y,
+                                     width=BUTTON2_WIDTH, height=BUTTON2_HEIGHT,
+                                     color=(0, 0, 100, 0), hover_color=(0, 0, 255, 0),
+                                     border_width=0,
+                                     text="")
+        # Add to buttons list so they are drawn and checked
+        self.buttons.append(self.rect_btn_1)
+        self.buttons.append(self.rect_btn_2)
             
     def on_draw(self):
         """Render the screen."""
@@ -98,6 +132,10 @@ class BaksoGame(arcade.Window):
         
         # Draw items
         self.item_sprites.draw()
+
+        # Draw buttons
+        for button in self.buttons:
+            button.draw()
     
     def on_update(self, delta_time):
         """Movement and game logic"""
@@ -111,4 +149,26 @@ class BaksoGame(arcade.Window):
     
     def on_mouse_press(self, x, y, button, modifiers):
         """Called when the user presses a mouse button."""
-        pass
+        # First let RectButton instances consume press state
+        handled = False
+        for b in [self.rect_btn_1, self.rect_btn_2]:
+            if b.on_mouse_press(x, y, button, modifiers):
+                handled = True
+
+        # Fallback to older button types
+        if not handled:
+            for b in self.buttons:
+                # RoundButton uses is_clicked
+                if hasattr(b, 'is_clicked') and b.is_clicked(x, y):
+                    print(f"Button '{getattr(b, 'text', '')}' clicked at ({x}, {y})!")
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        # Check rect buttons for click completion
+        for b in [self.rect_btn_1, self.rect_btn_2]:
+            if b.on_mouse_release(x, y, button, modifiers):
+                print(f"Rect button '{b.text}' clicked at ({x}, {y})!")
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        # update hover state for rect buttons
+        for b in [self.rect_btn_1, self.rect_btn_2]:
+            b.on_mouse_motion(x, y, dx, dy)
