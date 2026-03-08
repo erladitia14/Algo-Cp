@@ -57,18 +57,18 @@ PEMBELI_POS_Y        = 120
 
 # ─── Cooking Stations ────────────────────────────────────────────────────────
 # Panci Bakso
-BAKSO_STATION_X      = 310
-BAKSO_STATION_Y      = 205
+BAKSO_STATION_X      = 336
+BAKSO_STATION_Y      = 240
 COOK_TIME            = 3.0        # Detik untuk memasak bakso
 
 # Mie
-MIE_STATION_X        = 445
-MIE_STATION_Y        = 205
+MIE_STATION_X        = 983
+MIE_STATION_Y        = 371
 MIE_TIME             = 2.0        # Detik untuk menambah mie
 
 # Sayuran
-SAYURAN_STATION_X    = 570
-SAYURAN_STATION_Y    = 205
+SAYURAN_STATION_X    = 1025
+SAYURAN_STATION_Y    = 216
 SAYURAN_TIME         = 1.5        # Detik untuk menambah sayuran
 
 # ─── Mangkok ─────────────────────────────────────────────────────────────────

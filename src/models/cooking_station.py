@@ -76,37 +76,50 @@ class CookingStation:
         return (dx * dx + dy * dy) <= self.click_radius ** 2
 
     def draw(self):
-        base_color = (100, 70, 40, 220)
+        # Hotspot marker (bukan tombol bulat besar)
+        accent = (180, 150, 110, 230)
+        status = "KLIK"
         if self.is_ready:
-            base_color = (50, 200, 80, 220)
+            accent = (80, 230, 130, 240)
+            status = "SIAP"
         elif self.is_cooking:
-            base_color = (255, 160, 30, 220)
+            accent = (255, 185, 80, 240)
+            status = "MASAK..."
         elif self.hovered:
-            base_color = (140, 100, 60, 220)
+            accent = (235, 195, 130, 240)
 
-        arcade.draw_circle_filled(self.x, self.y, self.click_radius, base_color)
-        arcade.draw_circle_outline(self.x, self.y, self.click_radius, (255, 255, 255, 120), 2)
+        # Titik hotspot
+        arcade.draw_circle_filled(self.x, self.y, 6, accent)
+        if self.hovered or self.is_cooking or self.is_ready:
+            arcade.draw_circle_outline(self.x, self.y, 16, accent, 2)
 
+        # Tag label di atas hotspot
+        chip_w = max(96, len(self.label) * 8 + 26)
+        chip_h = 24
+        chip_x = self.x - chip_w / 2
+        chip_y = self.y + 18
+        arcade.draw_lbwh_rectangle_filled(chip_x, chip_y, chip_w, chip_h, (26, 18, 10, 220))
+        arcade.draw_lbwh_rectangle_outline(chip_x, chip_y, chip_w, chip_h, accent, 2)
         arcade.draw_text(
-            self.label, self.x, self.y,
-            (255, 255, 255, 220), font_size=13,
+            self.label, self.x, chip_y + chip_h / 2,
+            (245, 235, 215, 255), font_size=12,
+            anchor_x="center", anchor_y="center", bold=True
+        )
+
+        # Status kecil di bawah hotspot
+        arcade.draw_text(
+            status, self.x, self.y - 14,
+            accent, font_size=10,
             anchor_x="center", anchor_y="center", bold=True
         )
 
         if self.is_cooking:
-            bw = self.click_radius * 2
-            bx = self.x - self.click_radius
-            by = self.y - self.click_radius - 12
-            arcade.draw_lbwh_rectangle_filled(bx, by, bw, 7, (60, 60, 60, 200))
-            arcade.draw_lbwh_rectangle_filled(bx, by, bw * self.progress, 7, (255, 200, 0, 230))
-            arcade.draw_lbwh_rectangle_outline(bx, by, bw, 7, (255, 255, 255, 120), 1)
-
-        if self.is_ready:
-            arcade.draw_text(
-                "✓", self.x, self.y + self.click_radius + 10,
-                (50, 255, 100, 255), font_size=18,
-                anchor_x="center", anchor_y="center", bold=True
-            )
+            bw = max(100, chip_w)
+            bx = self.x - bw / 2
+            by = chip_y + chip_h + 5
+            arcade.draw_lbwh_rectangle_filled(bx, by, bw, 6, (50, 45, 40, 220))
+            arcade.draw_lbwh_rectangle_filled(bx, by, bw * self.progress, 6, (255, 190, 70, 235))
+            arcade.draw_lbwh_rectangle_outline(bx, by, bw, 6, (255, 255, 255, 110), 1)
 
     def update_hover(self, mx: float, my: float):
         self.hovered = self.contains(mx, my)
@@ -118,6 +131,7 @@ class BaksoStation(CookingStation):
     def __init__(self, cook_time_override: float | None = None):
         t = cook_time_override if cook_time_override is not None else COOK_TIME
         super().__init__(BAKSO_STATION_X, BAKSO_STATION_Y, t, "🍢 Bakso")
+        self.click_radius = 72
 
 
 class MieStation(CookingStation):
@@ -125,7 +139,7 @@ class MieStation(CookingStation):
     def __init__(self, mie_time_override: float | None = None):
         t = mie_time_override if mie_time_override is not None else MIE_TIME
         super().__init__(MIE_STATION_X, MIE_STATION_Y, t, "🍜 Mie")
-
+        self.click_radius = 72
 
 class SayuranStation(CookingStation):
     """Sayuran — step 3."""
@@ -135,31 +149,50 @@ class SayuranStation(CookingStation):
 
 
 class MangkokStation(CookingStation):
-    """Mangkok — step 0 (instan, klik langsung siap)."""
+    """Mangkok button dengan sprite mangkok kosong."""
     def __init__(self):
-        super().__init__(MANGKOK_POS_X, MANGKOK_POS_Y, 0.0, "🥣")
+        super().__init__(MANGKOK_POS_X, MANGKOK_POS_Y, 0.0, "Mangkok")
         self.click_radius = 40
+        self._sprite = None
+        self._sprite_list = arcade.SpriteList()
+        try:
+            self._sprite = arcade.Sprite(f"{ITEMS_PATH}/Mangkok.jpeg", MANGKOK_SCALE)
+            self._sprite.center_x = self.x
+            self._sprite.center_y = self.y
+            self._sprite_list.append(self._sprite)
+        except Exception as e:
+            print(f"[WARN] Could not load mangkok sprite: {e}")
 
     def start_cooking(self):
         self.is_ready = True
 
     def draw(self):
-        base_color = (180, 130, 60, 200) if not self.is_ready else (50, 200, 80, 200)
-        if self.hovered:
-            base_color = (220, 170, 80, 220)
-        arcade.draw_circle_filled(self.x, self.y, self.click_radius, base_color)
-        arcade.draw_circle_outline(self.x, self.y, self.click_radius, (255, 255, 255, 120), 2)
+        accent = (210, 165, 90, 230)
+        status = "AMBIL"
+        if self.is_ready:
+            accent = (80, 230, 130, 240)
+            status = "SIAP"
+        elif self.hovered:
+            accent = (240, 195, 120, 240)
+
+        if self._sprite is not None:
+            self._sprite_list.draw()
+            if self.hovered or self.is_ready:
+                arcade.draw_ellipse_outline(
+                    self.x, self.y, self.click_radius * 2.4, self.click_radius * 2.0, accent, 2
+                )
+        else:
+            arcade.draw_text(
+                self.label, self.x, self.y,
+                (255, 255, 255, 230), font_size=14,
+                anchor_x="center", anchor_y="center", bold=True
+            )
+
         arcade.draw_text(
-            self.label, self.x, self.y,
-            (255, 255, 255, 230), font_size=14,
+            status, self.x, self.y - self.click_radius - 8,
+            accent, font_size=11,
             anchor_x="center", anchor_y="center", bold=True
         )
-        if self.is_ready:
-            arcade.draw_text("✓", self.x, self.y + self.click_radius + 10,
-                             (50, 255, 100, 255), font_size=18,
-                             anchor_x="center", anchor_y="center", bold=True)
-
-
 # ─── Bowl Display (Combined Images) ─────────────────────────────────────────
 class BowlDisplay:
     """
@@ -269,3 +302,4 @@ class BowlDisplay:
                 color, font_size=12,
                 anchor_x="center", anchor_y="center", bold=True
             )
+

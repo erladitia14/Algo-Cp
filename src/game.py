@@ -30,7 +30,6 @@ class GameState:
     MENU       = "menu"
     PLAYING    = "playing"
     DIALOG     = "dialog"
-    UPGRADE    = "upgrade"
     GAME_OVER  = "game_over"
 
 
@@ -85,11 +84,6 @@ class BaksoGame(arcade.Window):
         self.time_left   = GAME_DURATION
         self.combo_count = 0
 
-        # Cook time overrides (kept for station init)
-        self._cook_time_override    = None
-        self._mie_time_override     = None
-        self._sayuran_time_override = None
-
         # Pending poor customer awaiting dialog result
         self._pending_poor = None
 
@@ -122,9 +116,9 @@ class BaksoGame(arcade.Window):
 
         # ── Cooking stations
         self.mangkok_station  = MangkokStation()
-        self.bakso_station    = BaksoStation(self._cook_time_override)
-        self.mie_station      = MieStation(self._mie_time_override)
-        self.sayuran_station  = SayuranStation(self._sayuran_time_override)
+        self.bakso_station    = BaksoStation()
+        self.mie_station      = MieStation()
+        self.sayuran_station  = SayuranStation()
 
         # ── Bowl display
         self.bowl_display = BowlDisplay()
@@ -137,7 +131,6 @@ class BaksoGame(arcade.Window):
 
         self.dialog        = DialogBox(on_free=self._choose_free, on_pay=self._choose_pay)
         self.hud           = HUD()
-        self.upgrade_panel = UpgradePanel(on_upgrade=self._do_upgrade)
 
         # Game state
         self.state      = GameState.PLAYING
@@ -198,14 +191,8 @@ class BaksoGame(arcade.Window):
         # Sajikan button
         self._draw_sajikan_button()
 
-        # Upgrade toggle button
-        self._draw_upgrade_btn()
-
         # HUD
         self.hud.draw()
-
-        # Upgrade panel (on top)
-        self.upgrade_panel.draw(self.money, self.purchased_upgrades)
 
         # Dialog (topmost)
         self.dialog.draw()
@@ -222,32 +209,45 @@ class BaksoGame(arcade.Window):
             and self.bowl_display.matches_order(customer.order_type)
             and self.state == GameState.PLAYING
         )
-        if active:
-            fill = (200, 100, 10, 240) if self._sajikan_pressed else (240, 140, 20, 240)
-            if self._sajikan_hover:
-                fill = (255, 170, 40, 255)
-        else:
-            fill = (80, 80, 80, 160)
 
-        hw, hh = self._sajikan_w / 2, self._sajikan_h / 2
         cx, cy = self._sajikan_cx, self._sajikan_cy
-        arcade.draw_lbwh_rectangle_filled(cx - hw, cy - hh, self._sajikan_w, self._sajikan_h, fill)
-        arcade.draw_lbwh_rectangle_outline(
-            cx - hw, cy - hh, self._sajikan_w, self._sajikan_h,
-            (255, 255, 255, 180) if active else (120, 120, 120, 100), 2
-        )
+        accent = (120, 120, 120, 170)
+        status = "BELUM SIAP"
+        if active:
+            accent = (80, 230, 130, 240)
+            status = "KLIK UNTUK SAJI"
+            if self._sajikan_pressed:
+                accent = (55, 195, 105, 245)
+            elif self._sajikan_hover:
+                accent = (110, 245, 155, 250)
+        elif self._sajikan_hover:
+            accent = (170, 170, 170, 200)
+
+        # Hotspot marker kecil
+        arcade.draw_circle_filled(cx, cy, 6, accent)
+        if self._sajikan_hover or active:
+            arcade.draw_circle_outline(cx, cy, 16, accent, 2)
+
+        # Tag utama (gaya sama dengan stasiun lain)
+        chip_w = 150
+        chip_h = 30
+        chip_x = cx - chip_w / 2
+        chip_y = cy + 14
+        arcade.draw_lbwh_rectangle_filled(chip_x, chip_y, chip_w, chip_h, (26, 18, 10, 220))
+        arcade.draw_lbwh_rectangle_outline(chip_x, chip_y, chip_w, chip_h, accent, 2)
         arcade.draw_text(
-            "🍜  SAJIKAN",
-            cx, cy, (255, 255, 255, 255) if active else (150, 150, 150, 150),
-            font_size=16, anchor_x="center", anchor_y="center", bold=True
+            "SAJIKAN",
+            cx, chip_y + chip_h / 2,
+            (245, 235, 215, 255) if active else (170, 170, 170, 220),
+            font_size=13, anchor_x="center", anchor_y="center", bold=True
         )
 
-    def _draw_upgrade_btn(self):
-        cx, cy, r = self._upgrade_btn_cx, self._upgrade_btn_cy, self._upgrade_btn_r
-        arcade.draw_circle_filled(cx, cy, r, (80, 55, 15, 220))
-        arcade.draw_circle_outline(cx, cy, r, (200, 160, 60, 200), 2)
-        arcade.draw_text("⚡", cx, cy, (255, 220, 60, 255),
-                         font_size=16, anchor_x="center", anchor_y="center")
+        # Status kecil di bawah hotspot
+        arcade.draw_text(
+            status, cx, cy - 14,
+            accent if active else (155, 155, 155, 210),
+            font_size=10, anchor_x="center", anchor_y="center", bold=True
+        )
 
     def _draw_cook_step_indicator(self):
         """Bar status bahan — sesuaikan dengan pesanan pembeli."""
@@ -399,20 +399,11 @@ class BaksoGame(arcade.Window):
     def on_mouse_motion(self, x, y, dx, dy):
         self._last_mouse = (x, y)
         self.dialog.on_mouse_motion(x, y)
-        self.upgrade_panel.on_mouse_motion(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
         if self.dialog.visible:
             self.dialog.on_mouse_press(x, y, button, modifiers)
             return
-
-        if self.upgrade_panel.on_mouse_press(x, y, button, modifiers):
-            return
-
-        if self._in_upgrade_btn(x, y):
-            self.upgrade_panel.toggle()
-            return
-
         if self.state == GameState.MENU:
             if self._in_menu_play(x, y):
                 self.setup()
@@ -436,8 +427,6 @@ class BaksoGame(arcade.Window):
     def on_mouse_release(self, x, y, button, modifiers):
         if self.dialog.visible:
             self.dialog.on_mouse_release(x, y, button, modifiers)
-            return
-        if self.upgrade_panel.on_mouse_release(x, y, button, modifiers):
             return
         if self._sajikan_pressed and self._in_sajikan(x, y):
             self._sajikan_pressed = False
@@ -618,43 +607,11 @@ class BaksoGame(arcade.Window):
     def _game_over(self):
         self.state = GameState.GAME_OVER
 
-    # ─── Upgrade ─────────────────────────────────────────────────────────────
-    def _do_upgrade(self, key: str):
-        info = UPGRADES.get(key)
-        if not info:
-            return
-        if key in self.purchased_upgrades:
-            self.hud.add_notif("Sudah dibeli!", (200, 200, 100, 255))
-            return
-        if self.money < info["price"]:
-            self.hud.add_notif(f"Uang kurang! Butuh Rp{info['price']:,}", (255, 80, 80, 255))
-            return
-        self.money -= info["price"]
-        self.purchased_upgrades.add(key)
-        self.hud.add_notif(f"⚡ {info['name']} dibeli!", (255, 220, 80, 255))
-
-        if key == "mie_turbo":
-            self._mie_time_override = 1.0
-            self.mie_station = MieStation(1.0)
-        elif key == "wajan_ajaib":
-            self._cook_time_override = 1.5
-            self.bakso_station = BaksoStation(1.5)
-        elif key == "gerobak_cute":
-            for c in self.customer_mgr.customers:
-                c.max_patience *= 1.2
-                c.patience = min(c.patience * 1.2, c.max_patience)
-
-        self._update_hud()
-
-    # ─── Hit-tests ────────────────────────────────────────────────────────────
+    # Hit-tests
     def _in_sajikan(self, x, y):
         hw, hh = self._sajikan_w / 2, self._sajikan_h / 2
         cx, cy = self._sajikan_cx, self._sajikan_cy
         return cx - hw <= x <= cx + hw and cy - hh <= y <= cy + hh
-
-    def _in_upgrade_btn(self, x, y):
-        cx, cy, r = self._upgrade_btn_cx, self._upgrade_btn_cy, self._upgrade_btn_r
-        return (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2
 
     def _in_menu_play(self, x, y):
         return (SCREEN_WIDTH / 2 - 120 <= x <= SCREEN_WIDTH / 2 + 120
@@ -663,3 +620,5 @@ class BaksoGame(arcade.Window):
     def _in_game_over_restart(self, x, y):
         return (SCREEN_WIDTH / 2 - 130 <= x <= SCREEN_WIDTH / 2 + 130
                 and SCREEN_HEIGHT / 2 - 80 <= y <= SCREEN_HEIGHT / 2 - 26)
+
+
